@@ -12,16 +12,14 @@ const MapCore = dynamic(() => import('./map-core'), { ssr: false });
 const DEFAULT_CENTER: LatLngExpression = [49.8626951, 8.622622];
 const DEFAULT_ZOOM: number = 15;
 
-type Props = {};
-
-export default function Map({}: Props) {
+export default function Map() {
   const [mapReady, setMapReady] = useState(false);
   const [center, setCenter] = useState<LatLngExpression>(DEFAULT_CENTER);
   const { userLocation, isResolved } = useLocation();
 
   useEffect(() => {
     setCenter(userLocation);
-  }, [isResolved]);
+  }, [userLocation]);
 
   useEffect(() => {
     setMapReady(true);

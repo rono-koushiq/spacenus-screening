@@ -6,7 +6,7 @@ type Props = {
   fullScreen?: boolean;
 };
 
-export default function Loading({ fullScreen = true }: Props) {
+export default function Loading({}: Props) {
   return (
     <div className={cn(classes['loader-container'])}>
       <div className={cn(classes['loader'])} />

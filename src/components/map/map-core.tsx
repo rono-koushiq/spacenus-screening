@@ -58,20 +58,20 @@ export default function MapCore({ center, zoom }: Props) {
 
   const handleEdit = (event: L.DrawEvents.Edited) => {
     const layers = event.layers;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     layers.eachLayer((layer: any) => {
       console.log({ layer });
       const editedLayer = layer.toGeoJSON() as GeoJSON.Feature;
 
       const {
-        coordinates: [corners],
+        coordinates: [],
       } = editedLayer.geometry as GeoJSON.Polygon;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const areaId = (layer as any).id;
       console.log({ areaId });
     });
   };
-
-  const handleDelete = (event: L.DrawEvents.Deleted) => {};
 
   return (
     <MapContainer
@@ -92,7 +92,6 @@ export default function MapCore({ center, zoom }: Props) {
           }}
           onCreated={handleCreate}
           onEdited={handleEdit}
-          onDeleted={handleDelete}
         />
 
         {areas.map((area) => {

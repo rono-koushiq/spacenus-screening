@@ -6,9 +6,7 @@ import { useSelector } from 'react-redux';
 import Area from './area';
 import classes from './index.module.scss';
 
-type Props = {};
-
-export default function AreasPanel({}: Props) {
+export default function AreasPanel() {
   const { areas } = useSelector((state: RootState) => state.area);
 
   return (
