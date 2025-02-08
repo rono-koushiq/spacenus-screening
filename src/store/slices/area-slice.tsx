@@ -13,10 +13,7 @@ const areaSlice = createSlice({
   initialState,
   reducers: {
     createArea: (state, action: PayloadAction<AreaCreate>) => {
-      const areaId =
-        state.areas.length > 0
-          ? Math.max(...state.areas.map((area) => area.id)) + 1
-          : 0;
+      const areaId = action.payload.id;
       const areaLabel = `polygon_${areaId}`;
 
       state.areas.push({
@@ -31,12 +28,14 @@ const areaSlice = createSlice({
     },
 
     updateArea: (state, action: PayloadAction<AreaUpdate>) => {
-      const index = state.areas.findIndex(
+      const targetArea = state.areas.find(
         (area) => area.id === action.payload.id,
       );
-      if (index !== -1) {
-        state.areas[index].corners = action.payload.corners;
-      }
+      if (!targetArea) return;
+
+      const { id, ...restPayload } = action.payload; // eslint-disable-line @typescript-eslint/no-unused-vars
+
+      Object.assign(targetArea, restPayload);
     },
 
     deleteArea: (state, action: PayloadAction<Pick<Area, 'id'>>) => {

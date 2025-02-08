@@ -1,14 +1,14 @@
 'use client';
 import { cn } from '@/lib/utilities';
 import { RootState } from '@/store';
-import { createArea } from '@/store/slices/area-slice';
+import { createArea, deleteArea, updateArea } from '@/store/slices/area-slice';
 import L, { LatLngExpression } from 'leaflet';
 import dynamic from 'next/dynamic';
+import { useEffect, useRef } from 'react';
 import {
   AttributionControl,
   FeatureGroup,
   MapContainer,
-  Polygon,
   TileLayer,
 } from 'react-leaflet';
 import { useDispatch, useSelector } from 'react-redux';
@@ -19,15 +19,6 @@ const EditControl = dynamic(
   { ssr: false },
 );
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon.png',
-  iconUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon.png',
-  shadowUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
-});
-
 type Props = {
   center: LatLngExpression;
   zoom: number;
@@ -36,42 +27,93 @@ type Props = {
 export default function MapCore({ center, zoom }: Props) {
   const dispatch = useDispatch();
   const { areas } = useSelector((state: RootState) => state.area);
+  const featureGroupRef = useRef<L.FeatureGroup | null>(null);
 
-  const handleCreate = (event: L.DrawEvents.Created) => {
+  const _onCreated = (event: L.DrawEvents.Created) => {
     const layer = event.layer.toGeoJSON() as GeoJSON.Feature;
+    const leafletId = (event.layer as any)._leaflet_id as number;
 
-    const {
-      coordinates: [corners],
-    } = layer.geometry as GeoJSON.Polygon;
+    const invertedCoordinates = (
+      layer.geometry as GeoJSON.Polygon
+    ).coordinates[0].map((corner) => [corner[1], corner[0]]) as [
+      number,
+      number,
+    ][];
 
     dispatch(
       createArea({
-        corners: corners.map((corner) => [corner[1], corner[0]]) as [
-          number,
-          number,
-        ][],
+        id: leafletId,
+        corners: invertedCoordinates,
       }),
     );
-
-    event.layer.remove();
   };
 
-  const handleEdit = (event: L.DrawEvents.Edited) => {
+  const _onEdited = (event: L.DrawEvents.Edited) => {
     const layers = event.layers;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     layers.eachLayer((layer: any) => {
-      console.log({ layer });
-      const editedLayer = layer.toGeoJSON() as GeoJSON.Feature;
+      const leafletLayer = layer.toGeoJSON() as GeoJSON.Feature;
+      const leafletId = (layer as any)._leaflet_id as number;
+      const leafletCoordinates = (leafletLayer.geometry as GeoJSON.Polygon)
+        .coordinates[0];
 
-      const {
-        coordinates: [],
-      } = editedLayer.geometry as GeoJSON.Polygon;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const areaId = (layer as any).id;
-      console.log({ areaId });
+      dispatch(
+        updateArea({
+          id: leafletId,
+          corners: leafletCoordinates.map((corner) => [
+            corner[1],
+            corner[0],
+          ]) as [number, number][],
+        }),
+      );
     });
   };
+
+  const _onDeleted = (event: L.DrawEvents.Deleted) => {
+    const layers = event.layers;
+
+    layers.eachLayer((layer: any) => {
+      dispatch(
+        deleteArea({
+          id: layer._leaflet_id,
+        }),
+      );
+    });
+  };
+
+  useEffect(() => {
+    console.log({ areas });
+    if (!featureGroupRef || !featureGroupRef.current) return;
+
+    featureGroupRef.current.eachLayer((layer: any) => {
+      const leafletLayer = layer.toGeoJSON() as GeoJSON.Feature;
+      const leafletId = (layer as any)._leaflet_id as number;
+
+      const area = areas.find((a) => a.id === leafletId);
+      if (!area) {
+        featureGroupRef.current?.removeLayer(layer);
+        return;
+      }
+
+      const leafletCoordinates = (leafletLayer.geometry as GeoJSON.Polygon)
+        .coordinates[0];
+
+      if (
+        JSON.stringify(
+          leafletCoordinates.map((coordinate) => [
+            coordinate[1],
+            coordinate[0],
+          ]),
+        ) !== JSON.stringify(area.corners)
+      ) {
+        const newLatLngs = area.corners.map(
+          ([lat, lng]) => new L.LatLng(lat, lng),
+        );
+        layer.setLatLngs(newLatLngs);
+        layer.redraw();
+      }
+    });
+  }, [areas]);
 
   return (
     <MapContainer
@@ -80,7 +122,7 @@ export default function MapCore({ center, zoom }: Props) {
       className={cn(classes['leaflet-container'])}
       attributionControl={false}
     >
-      <FeatureGroup>
+      <FeatureGroup ref={featureGroupRef}>
         <EditControl
           position="topleft"
           draw={{
@@ -90,25 +132,10 @@ export default function MapCore({ center, zoom }: Props) {
             marker: false,
             polyline: false,
           }}
-          onCreated={handleCreate}
-          onEdited={handleEdit}
+          onCreated={_onCreated}
+          onEdited={_onEdited}
+          onDeleted={_onDeleted}
         />
-
-        {areas.map((area) => {
-          console.log(area.corners);
-          return (
-            <Polygon
-              key={area.id}
-              positions={area.corners}
-              pathOptions={{
-                color: area.borderColor,
-                fillColor: area.fillColor,
-                fillOpacity: 0.5,
-                weight: 2,
-              }}
-            />
-          );
-        })}
       </FeatureGroup>
 
       <TileLayer
